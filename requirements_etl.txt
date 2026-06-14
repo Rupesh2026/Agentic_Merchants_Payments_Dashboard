@@ -1,0 +1,23 @@
+# Full ETL + ML deps — run locally only (needs Java JDK 17 for PySpark)
+# Install with: pip install -r requirements_etl.txt
+
+-r requirements.txt
+
+# ETL
+pyarrow==15.0.2
+faker==24.11.0
+
+# ML
+xgboost==2.0.3
+scikit-learn==1.4.2
+shap==0.45.0
+imbalanced-learn==0.12.3
+joblib==1.4.2
+mlflow==3.13.0
+matplotlib==3.9.0
+scipy==1.13.1
+tqdm==4.66.4
+
+# PySpark + Delta Lake (requires Java 17 on PATH)
+# pyspark==3.5.1
+# delta-spark==3.2.0

@@ -1,0 +1,29 @@
+# Data + intermediate stores
+data/raw/
+data/processed/
+data/delta/
+data/spark-warehouse/
+data/spark-tmp/
+
+# ML + experiment tracking
+ml/artifacts/
+mlruns/
+
+# Spark / Ivy jar cache
+spark-warehouse/
+.ivy2/
+
+# Secrets + logs
+.env
+*.log
+pipeline_*.log
+
+# Python
+__pycache__/
+*.pyc
+.DS_Store
+
+# Virtual environment
+.venv/
+venv/
+env/

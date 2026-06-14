@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: payments_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: payments_db
+      POSTGRES_USER: payments_user
+      POSTGRES_PASSWORD: payments_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - payments_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payments_user -d payments_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  payments_pgdata:
