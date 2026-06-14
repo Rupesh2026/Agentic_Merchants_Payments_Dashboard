@@ -1,5 +1,6 @@
 """dashboard/app.py — Payments Dashboard."""
 
+import os
 import sys
 from pathlib import Path
 
@@ -13,6 +14,15 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# Guard: catch missing env vars early with a clear message
+if not os.getenv("DATABASE_URL"):
+    st.error(
+        "**DATABASE_URL is not set.**\n\n"
+        "Add it in Render → your service → Environment:\n"
+        "```\nDATABASE_URL = postgresql://postgres.<ref>:<password>@aws-0-us-east-1.pooler.supabase.com:5432/postgres\n```"
+    )
+    st.stop()
 
 st.markdown("""
 <style>
