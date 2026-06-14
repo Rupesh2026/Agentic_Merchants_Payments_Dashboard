@@ -1,0 +1,14 @@
+.venv/
+.git/
+.env
+data/raw/
+data/processed/
+data/delta/
+data/spark-warehouse/
+data/spark-tmp/
+mlruns/
+ml/artifacts/
+__pycache__/
+*.pyc
+*.log
+.DS_Store
