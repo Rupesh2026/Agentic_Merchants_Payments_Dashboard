@@ -1,21 +1,11 @@
 """dashboard/app.py — Payments Dashboard."""
 
-import os
 import sys
 from pathlib import Path
 
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-# Streamlit Cloud stores secrets in st.secrets; bridge them into os.environ
-# so config/settings.py (which uses os.getenv) picks them up automatically.
-try:
-    for _k, _v in st.secrets.items():
-        if isinstance(_v, str):
-            os.environ.setdefault(_k, _v)
-except Exception:
-    pass
 
 st.set_page_config(
     page_title="PayDash",
