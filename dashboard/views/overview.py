@@ -196,8 +196,8 @@ def render():
                 use_container_width=True,
             )
         else:
-            total_n = max(int(latest.total_transactions), 1)
-            approved_n = int(latest.approval_rate * total_n)
+            total_n = max(int(curr["total_transactions"]), 1)
+            approved_n = int(curr["approval_rate"] * total_n)
             declined_n = total_n - approved_n
             st.markdown("**Approval mix (last period)**")
             st.markdown(
