@@ -52,7 +52,7 @@ def render():
             unsafe_allow_html=True,
         )
 
-        trend_df = charts.aggregate_kpi_timeseries(mkpi.sort_values("date"), trend_grain)
+        trend_df = charts.aggregate_kpi_timeseries(mkpi.sort_values("date").tail(days), trend_grain)
         if not trend_df.empty:
             _ml = trend_df.iloc[-1].to_dict()
             p_vol   = float(_ml.get("gross_volume") or 0)
@@ -156,7 +156,7 @@ def render():
 
     # ── Portfolio mode ────────────────────────────────────────────────────────
     kpi = data.kpi_all()
-    trend_df = charts.aggregate_kpi_timeseries(kpi.sort_values("date"), trend_grain)
+    trend_df = charts.aggregate_kpi_timeseries(kpi.sort_values("date").tail(days), trend_grain)
     c1, c2, c3 = st.columns(3)
     if not trend_df.empty:
         _kl = trend_df.iloc[-1].to_dict()
