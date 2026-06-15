@@ -52,11 +52,15 @@ def render():
             unsafe_allow_html=True,
         )
 
-        mkpi_period = mkpi.sort_values("date", ascending=False).head(days)
-        p_vol   = mkpi_period["gross_volume"].sum()
-        p_txns  = int(mkpi_period["total_transactions"].sum())
-        p_fraud = mkpi_period["fraud_rate"].mean()
-        p_appr  = mkpi_period["approval_rate"].mean()
+        trend_df = charts.aggregate_kpi_timeseries(mkpi.sort_values("date"), trend_grain)
+        if not trend_df.empty:
+            _ml = trend_df.iloc[-1].to_dict()
+            p_vol   = float(_ml.get("gross_volume") or 0)
+            p_txns  = int(_ml.get("total_transactions") or 0)
+            p_fraud = float(_ml.get("fraud_rate") or 0)
+            p_appr  = float(_ml.get("approval_rate") or 0)
+        else:
+            p_vol = p_txns = p_fraud = p_appr = 0
 
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Volume (period)", f"${p_vol:,.0f}")
@@ -78,7 +82,7 @@ def render():
                 'Hover for the exact amount. Use the period selector above to switch between month, quarter, and year views.</p>',
                 unsafe_allow_html=True,
             )
-            trend_df = charts.aggregate_kpi_timeseries(mkpi, trend_grain)
+            # trend_df already computed above for metrics
             st.plotly_chart(
                 charts.time_bar_chart(trend_df, "period_label", "gross_volume", title_y="Revenue ($)"),
                 use_container_width=True,
@@ -152,11 +156,17 @@ def render():
 
     # ── Portfolio mode ────────────────────────────────────────────────────────
     kpi = data.kpi_all()
-    kpi_period = data.kpi_daily(days)
+    trend_df = charts.aggregate_kpi_timeseries(kpi.sort_values("date"), trend_grain)
     c1, c2, c3 = st.columns(3)
-    c1.metric("Gross Volume", f"${kpi_period['gross_volume'].sum():,.0f}")
-    c2.metric("Transactions", f"{int(kpi_period['total_transactions'].sum()):,}")
-    c3.metric("Avg Approval Rate", f"{kpi_period['approval_rate'].mean():.2%}")
+    if not trend_df.empty:
+        _kl = trend_df.iloc[-1].to_dict()
+        c1.metric("Gross Volume", f"${float(_kl.get('gross_volume') or 0):,.0f}")
+        c2.metric("Transactions", f"{int(_kl.get('total_transactions') or 0):,}")
+        c3.metric("Avg Approval Rate", f"{float(_kl.get('approval_rate') or 0):.2%}")
+    else:
+        c1.metric("Gross Volume", "$0")
+        c2.metric("Transactions", "0")
+        c3.metric("Avg Approval Rate", "0%")
 
     st.markdown('<div class="section-header">Revenue trend</div>', unsafe_allow_html=True)
     st.markdown(
@@ -164,7 +174,6 @@ def render():
         'Hover for the exact amount and use the period selector above to switch between month, quarter, and year views.</p>',
         unsafe_allow_html=True,
     )
-    trend_df = charts.aggregate_kpi_timeseries(kpi, trend_grain)
     st.plotly_chart(
         charts.time_bar_chart(trend_df, "period_label", "gross_volume", title_y="Revenue ($)"),
         use_container_width=True,

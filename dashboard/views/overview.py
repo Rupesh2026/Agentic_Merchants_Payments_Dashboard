@@ -60,27 +60,41 @@ def render():
             st.info("No data yet.")
             return
 
-    all_df = all_df.sort_values("date", ascending=False)
-    curr_df = all_df.head(days) if days < len(all_df) else all_df
-    prior_df = all_df.iloc[days: days * 2] if len(all_df) > days else pd.DataFrame()
+    # Read trend_grain early (widget rendered later; session_state persists value across reruns)
+    if "overview_trend_grain" not in st.session_state:
+        st.session_state["overview_trend_grain"] = "Month"
+    trend_grain = st.session_state["overview_trend_grain"]
 
-    def _agg(df):
-        if df.empty:
-            return None
+    all_df = all_df.sort_values("date", ascending=True)
+    curr_df = all_df.tail(days) if days < len(all_df) else all_df
+
+    # Aggregate by trend grain — same data drives both KPI boxes and charts
+    chart_df = charts.aggregate_kpi_timeseries(curr_df, trend_grain)
+
+    def _row_to_kpi(row: dict) -> dict:
+        gv = float(row.get("gross_volume") or 0)
+        tx = float(row.get("total_transactions") or 0)
         return {
-            "gross_volume":      float(df["gross_volume"].sum()),
-            "total_transactions": float(df["total_transactions"].sum()),
-            "avg_ticket":        float(df["avg_ticket"].mean()),
-            "approval_rate":     float(df["approval_rate"].mean()),
-            "fraud_rate":        float(df["fraud_rate"].mean()),
-            "chargeback_count":  int(df["chargeback_count"].sum()) if "chargeback_count" in df.columns else 0,
-            "declined_count":    int(df["declined_count"].sum())    if "declined_count"    in df.columns else 0,
-            "net_volume":        float(df["net_volume"].sum())       if "net_volume"        in df.columns else float(df["gross_volume"].sum() * 0.98),
-            "processing_fees":   float(df["processing_fees"].sum())  if "processing_fees"   in df.columns else float(df["gross_volume"].sum() * 0.02),
+            "gross_volume":       gv,
+            "total_transactions": tx,
+            "avg_ticket":         float(row.get("avg_ticket") or (gv / max(tx, 1))),
+            "approval_rate":      float(row.get("approval_rate") or 0.95),
+            "fraud_rate":         float(row.get("fraud_rate") or 0),
+            "chargeback_count":   int(row.get("chargeback_count") or 0),
+            "declined_count":     int(row.get("declined_count") or 0),
+            "net_volume":         gv * 0.98,
+            "processing_fees":    gv * 0.02,
         }
 
-    curr  = _agg(curr_df)
-    prior = _agg(prior_df) or curr
+    _zero_kpi = {"gross_volume": 0, "total_transactions": 0, "avg_ticket": 0,
+                 "approval_rate": 0.95, "fraud_rate": 0, "chargeback_count": 0,
+                 "declined_count": 0, "net_volume": 0, "processing_fees": 0}
+
+    if not chart_df.empty:
+        curr  = _row_to_kpi(chart_df.iloc[-1].to_dict())
+        prior = _row_to_kpi(chart_df.iloc[-2].to_dict()) if len(chart_df) >= 2 else curr
+    else:
+        curr = prior = _zero_kpi
 
     st.markdown("## Overview")
     st.markdown(
@@ -165,8 +179,7 @@ def render():
             _nav("Fraud & Risk")
 
     # ── Charts ────────────────────────────────────────────────────────────────
-    chart_source = data.merchant_kpi_daily(merchant) if merchant != "All Merchants" else data.kpi_all()
-    chart_df = charts.aggregate_kpi_timeseries(chart_source.sort_values("date"), trend_grain)
+    # chart_df already aggregated above (same data as KPI boxes)
 
     left, right = st.columns([2, 1])
     with left:
