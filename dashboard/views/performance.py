@@ -11,9 +11,12 @@ from config.settings import CATEGORY_DISPLAY, INDUSTRY_FRAUD_RATE
 from dashboard import data
 from dashboard.components import charts
 
+PERIOD_DAYS = {"Last 7 days": 7, "Last 30 days": 30, "Last 90 days": 90, "All time": 730}
+
 
 def render():
     merchant = st.session_state.get("selected_merchant", "All Merchants")
+    days = PERIOD_DAYS.get(st.session_state.get("period", "Last 30 days"), 30)
     st.markdown("## Performance")
     st.markdown(
         '<p class="section-desc" style="margin-top:2px">Deep dive into your business growth — '
@@ -49,11 +52,17 @@ def render():
             unsafe_allow_html=True,
         )
 
+        mkpi_period = mkpi.sort_values("date", ascending=False).head(days)
+        p_vol   = mkpi_period["gross_volume"].sum()
+        p_txns  = int(mkpi_period["total_transactions"].sum())
+        p_fraud = mkpi_period["fraud_rate"].mean()
+        p_appr  = mkpi_period["approval_rate"].mean()
+
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Total Volume", f"${m['total_volume']:,.0f}")
-        c2.metric("Transactions", f"{int(m['total_transactions']):,}")
-        c3.metric("Fraud Rate", f"{m['fraud_rate']:.3%}", f"Portfolio {port_fr:.3%}", delta_color="inverse")
-        c4.metric("Approval Rate", f"{m['approval_rate']:.2%}", f"Portfolio {port_ar:.2%}")
+        c1.metric("Volume (period)", f"${p_vol:,.0f}")
+        c2.metric("Transactions", f"{p_txns:,}")
+        c3.metric("Fraud Rate", f"{p_fraud:.3%}", f"Portfolio {port_fr:.3%}", delta_color="inverse")
+        c4.metric("Approval Rate", f"{p_appr:.2%}", f"Portfolio {port_ar:.2%}")
 
         if m["fraud_rate"] > INDUSTRY_FRAUD_RATE * 2:
             st.markdown(
@@ -143,10 +152,11 @@ def render():
 
     # ── Portfolio mode ────────────────────────────────────────────────────────
     kpi = data.kpi_all()
+    kpi_period = data.kpi_daily(days)
     c1, c2, c3 = st.columns(3)
-    c1.metric("Total Gross Volume", f"${kpi['gross_volume'].sum():,.0f}")
-    c2.metric("Total Transactions", f"{int(kpi['total_transactions'].sum()):,}")
-    c3.metric("Avg Approval Rate", f"{kpi['approval_rate'].mean():.2%}")
+    c1.metric("Gross Volume", f"${kpi_period['gross_volume'].sum():,.0f}")
+    c2.metric("Transactions", f"{int(kpi_period['total_transactions'].sum()):,}")
+    c3.metric("Avg Approval Rate", f"{kpi_period['approval_rate'].mean():.2%}")
 
     st.markdown('<div class="section-header">Revenue trend</div>', unsafe_allow_html=True)
     st.markdown(

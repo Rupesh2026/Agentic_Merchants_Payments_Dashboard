@@ -48,18 +48,39 @@ def render():
                 unsafe_allow_html=True,
             )
 
-    # ── Load time-series data ─────────────────────────────────────────────────
+    # ── Load and aggregate period data ────────────────────────────────────────
     if merchant != "All Merchants":
-        df = data.merchant_kpi_daily(merchant)
-        if df.empty:
+        all_df = data.merchant_kpi_daily(merchant)
+        if all_df.empty:
             st.info(f"No data found for merchant '{merchant}'.")
             return
     else:
-        df = data.kpi_daily(days)
+        all_df = data.kpi_all()
+        if all_df.empty:
+            st.info("No data yet.")
+            return
 
-    df = df.sort_values("date", ascending=False)
-    latest = df.iloc[0]
-    prior = df.iloc[1] if len(df) > 1 else df.iloc[0]
+    all_df = all_df.sort_values("date", ascending=False)
+    curr_df = all_df.head(days) if days < len(all_df) else all_df
+    prior_df = all_df.iloc[days: days * 2] if len(all_df) > days else pd.DataFrame()
+
+    def _agg(df):
+        if df.empty:
+            return None
+        return {
+            "gross_volume":      float(df["gross_volume"].sum()),
+            "total_transactions": float(df["total_transactions"].sum()),
+            "avg_ticket":        float(df["avg_ticket"].mean()),
+            "approval_rate":     float(df["approval_rate"].mean()),
+            "fraud_rate":        float(df["fraud_rate"].mean()),
+            "chargeback_count":  int(df["chargeback_count"].sum()) if "chargeback_count" in df.columns else 0,
+            "declined_count":    int(df["declined_count"].sum())    if "declined_count"    in df.columns else 0,
+            "net_volume":        float(df["net_volume"].sum())       if "net_volume"        in df.columns else float(df["gross_volume"].sum() * 0.98),
+            "processing_fees":   float(df["processing_fees"].sum())  if "processing_fees"   in df.columns else float(df["gross_volume"].sum() * 0.02),
+        }
+
+    curr  = _agg(curr_df)
+    prior = _agg(prior_df) or curr
 
     st.markdown("## Overview")
     st.markdown(
@@ -78,27 +99,25 @@ def render():
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
-        d, t = pct_delta(latest.gross_volume, prior.gross_volume)
-        kpi_card("Gross Volume", f"${latest.gross_volume:,.0f}", d, t)
+        d, t = pct_delta(curr["gross_volume"], prior["gross_volume"])
+        kpi_card("Gross Volume", f"${curr['gross_volume']:,.0f}", d, t)
         if st.button("→ Performance", key="nav_perf", use_container_width=True):
             _nav("Performance")
 
     with c2:
-        d, t = pct_delta(latest.total_transactions, prior.total_transactions)
-        kpi_card("Transactions", f"{int(latest.total_transactions):,}", d, t)
+        d, t = pct_delta(curr["total_transactions"], prior["total_transactions"])
+        kpi_card("Transactions", f"{int(curr['total_transactions']):,}", d, t)
         if st.button("→ Explore", key="nav_txns", use_container_width=True):
             _nav("Transactions")
 
     with c3:
-        d, t = pct_delta(latest.avg_ticket, prior.avg_ticket)
-        kpi_card("Avg Ticket", f"${latest.avg_ticket:.2f}", d, t)
+        d, t = pct_delta(curr["avg_ticket"], prior["avg_ticket"])
+        kpi_card("Avg Ticket", f"${curr['avg_ticket']:.2f}", d, t)
         if st.button("→ Transactions", key="nav_txns2", use_container_width=True):
             _nav("Transactions")
 
     with c4:
-        net = latest.get("net_volume", latest.gross_volume * 0.98)
-        fees = latest.get("processing_fees", latest.gross_volume * 0.02)
-        kpi_card("Net Volume", f"${net:,.0f}", f"After ${fees:,.0f} fees", "flat")
+        kpi_card("Net Volume", f"${curr['net_volume']:,.0f}", f"After ${curr['processing_fees']:,.0f} fees", "flat")
         if st.button("→ Payouts", key="nav_payouts", use_container_width=True):
             _nav("Payouts")
 
@@ -118,29 +137,29 @@ def render():
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
-        d, t = pct_delta(latest.approval_rate, prior.approval_rate)
-        kpi_card("Approval Rate", f"{latest.approval_rate:.2%}", d, t)
+        d, t = pct_delta(curr["approval_rate"], prior["approval_rate"])
+        kpi_card("Approval Rate", f"{curr['approval_rate']:.2%}", d, t)
 
     with c2:
-        declined_n = int(latest.get("declined_count", 0))
+        declined_n = curr["declined_count"]
         kpi_card(
             "Declined", f"{declined_n:,}",
-            f"{declined_n / max(int(latest.total_transactions), 1):.2%} of txns",
-            "down" if declined_n > int(prior.get("declined_count", 0)) else "up",
+            f"{declined_n / max(int(curr['total_transactions']), 1):.2%} of txns",
+            "down" if declined_n > prior["declined_count"] else "up",
         )
 
     with c3:
-        cb = int(latest.get("chargeback_count", 0))
+        cb = curr["chargeback_count"]
         kpi_card(
             "Chargebacks", f"{cb:,}",
-            "↑ vs prior" if cb > int(prior.get("chargeback_count", 0)) else "stable",
-            "down" if cb > int(prior.get("chargeback_count", 0)) else "up",
+            "up vs prior" if cb > prior["chargeback_count"] else "stable",
+            "down" if cb > prior["chargeback_count"] else "up",
         )
 
     with c4:
-        fr = latest.fraud_rate
+        fr = curr["fraud_rate"]
         ind_ok = fr <= INDUSTRY_FRAUD_RATE
-        d, _ = pct_delta(fr, prior.fraud_rate)
+        d, _ = pct_delta(fr, prior["fraud_rate"])
         kpi_card("Fraud Rate", f"{fr:.4%}", d, "up" if ind_ok else "down")
         if st.button("→ Fraud & Risk", key="nav_fraud", use_container_width=True):
             _nav("Fraud & Risk")
