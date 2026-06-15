@@ -11,12 +11,8 @@ from config.settings import CATEGORY_DISPLAY, INDUSTRY_FRAUD_RATE
 from dashboard import data
 from dashboard.components import charts
 
-PERIOD_DAYS = {"Last 7 days": 7, "Last 30 days": 30, "Last 90 days": 90, "All time": 730}
-
-
 def render():
     merchant = st.session_state.get("selected_merchant", "All Merchants")
-    days = PERIOD_DAYS.get(st.session_state.get("period", "Last 30 days"), 30)
     st.markdown("## Performance")
     st.markdown(
         '<p class="section-desc" style="margin-top:2px">Deep dive into your business growth — '
@@ -52,7 +48,7 @@ def render():
             unsafe_allow_html=True,
         )
 
-        trend_df = charts.aggregate_kpi_timeseries(mkpi.sort_values("date").tail(days), trend_grain)
+        trend_df = charts.aggregate_kpi_timeseries(mkpi.sort_values("date"), trend_grain)
         if not trend_df.empty:
             _ml = trend_df.iloc[-1].to_dict()
             p_vol   = float(_ml.get("gross_volume") or 0)
@@ -156,7 +152,7 @@ def render():
 
     # ── Portfolio mode ────────────────────────────────────────────────────────
     kpi = data.kpi_all()
-    trend_df = charts.aggregate_kpi_timeseries(kpi.sort_values("date").tail(days), trend_grain)
+    trend_df = charts.aggregate_kpi_timeseries(kpi.sort_values("date"), trend_grain)
     c1, c2, c3 = st.columns(3)
     if not trend_df.empty:
         _kl = trend_df.iloc[-1].to_dict()

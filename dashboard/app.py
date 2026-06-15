@@ -359,20 +359,6 @@ with st.sidebar:
     )
     st.session_state["page"] = page
 
-    st.markdown("---")
-
-    # Period
-    st.markdown('<div class="sb-section-label">Time Period</div>', unsafe_allow_html=True)
-    _period_opts = ["Last 7 days", "Last 30 days", "Last 90 days", "All time"]
-    _period_idx = _period_opts.index(st.session_state.get("period", "Last 30 days"))
-    period = st.selectbox(
-        "Period",
-        _period_opts,
-        index=_period_idx,
-        label_visibility="collapsed",
-    )
-    st.session_state["period"] = period
-
     # Watchlist
     wl = st.session_state.get("watchlist", set())
     if wl:

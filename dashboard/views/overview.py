@@ -14,7 +14,6 @@ from dashboard.components import charts
 from dashboard.components.kpi_cards import kpi_card, pct_delta
 from dashboard.components import tables
 
-PERIOD_DAYS = {"Last 7 days": 7, "Last 30 days": 30, "Last 90 days": 90, "All time": 730}
 
 
 def _nav(page: str):
@@ -24,7 +23,6 @@ def _nav(page: str):
 
 def render():
     merchant = st.session_state.get("selected_merchant", "All Merchants")
-    days = PERIOD_DAYS.get(st.session_state.get("period", "Last 30 days"), 30)
 
     if not data.has_data():
         st.warning("No data yet. Run `python run_pipeline.py` first.")
@@ -66,7 +64,7 @@ def render():
     trend_grain = st.session_state["overview_trend_grain"]
 
     all_df = all_df.sort_values("date", ascending=True)
-    curr_df = all_df.tail(days) if days < len(all_df) else all_df
+    curr_df = all_df
 
     # Aggregate by trend grain — same data drives both KPI boxes and charts
     chart_df = charts.aggregate_kpi_timeseries(curr_df, trend_grain)
