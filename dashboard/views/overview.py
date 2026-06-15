@@ -74,6 +74,8 @@ def render():
     def _row_to_kpi(row: dict) -> dict:
         gv = float(row.get("gross_volume") or 0)
         tx = float(row.get("total_transactions") or 0)
+        pf = float(row.get("processing_fees") or gv * 0.022)  # fallback ~2.2% blended rate
+        nv = float(row.get("net_volume") or (gv - pf))
         return {
             "gross_volume":       gv,
             "total_transactions": tx,
@@ -82,8 +84,8 @@ def render():
             "fraud_rate":         float(row.get("fraud_rate") or 0),
             "chargeback_count":   int(row.get("chargeback_count") or 0),
             "declined_count":     int(row.get("declined_count") or 0),
-            "net_volume":         gv * 0.98,
-            "processing_fees":    gv * 0.02,
+            "net_volume":         nv,
+            "processing_fees":    pf,
         }
 
     _zero_kpi = {"gross_volume": 0, "total_transactions": 0, "avg_ticket": 0,

@@ -25,13 +25,15 @@ FEE_RATES = {
     "Visa": 0.0215, "Mastercard": 0.0220, "Amex": 0.0350,
     "ACH": 0.0080, "Other": 0.0250,
 }
+# Interchange + processing + network(0.0015) + scheme(0.0010) must sum to FEE_RATES per network.
 INTERCHANGE_RATES = {
-    "Visa": 0.0175, "Mastercard": 0.0, "Amex": 0.0, "ACH": 0.0, "Other": 0.0,
+    "Visa": 0.0160, "Mastercard": 0.0165, "Amex": 0.0300, "ACH": 0.0025, "Other": 0.0195,
 }
 PROCESSING_RATES = {
-    "Visa": 0.0040, "Mastercard": 0.0045, "Amex": 0.0100,
-    "ACH": 0.0030, "Other": 0.0050,
+    "Visa": 0.0030, "Mastercard": 0.0030, "Amex": 0.0030, "ACH": 0.0030, "Other": 0.0030,
 }
+NETWORK_FEE_RATE = 0.0015   # Visa/MC/Amex network assessment fee
+SCHEME_FEE_RATE  = 0.0010   # card-brand scheme fee
 
 
 def _write(df: pd.DataFrame, table: str, schema: str = "gold") -> None:
@@ -102,14 +104,14 @@ def _merchant_stats(ct: pd.DataFrame, rs: pd.DataFrame) -> pd.DataFrame:
         risk_score_avg    =("risk_score",     "mean"),
         first_seen        =("trans_at",       lambda x: pd.to_datetime(x).dt.date.min()),
         last_seen         =("trans_at",       lambda x: pd.to_datetime(x).dt.date.max()),
-        decline_count     =("txn_status",     lambda x: (x == "declined").sum()),
+        approved_count    =("txn_status",     lambda x: (x == "approved").sum()),
     ).reset_index()
 
     stats = stats.merge(primary_cat, on="merchant", how="left")
     stats["fraud_rate"]    = stats["fraud_count"]   / stats["total_transactions"]
-    stats["approval_rate"] = 1 - (stats["decline_count"] / stats["total_transactions"])
+    stats["approval_rate"] = stats["approved_count"] / stats["total_transactions"]
     stats["risk_score_avg"] = stats["risk_score_avg"].fillna(0)
-    return stats.drop(columns="decline_count")
+    return stats.drop(columns="approved_count")
 
 
 def _category_stats(ct: pd.DataFrame) -> pd.DataFrame:
@@ -160,8 +162,8 @@ def _payout_history(ct: pd.DataFrame) -> pd.DataFrame:
     approved["settlement_date"] = pd.to_datetime(approved["settlement_date"])
     approved["payout_week"] = approved["settlement_date"].dt.to_period("W").dt.start_time
 
-    approved["interchange"] = approved["amt"] * approved["card_network"].map(INTERCHANGE_RATES).fillna(0)
-    approved["processing"]  = approved["amt"] * approved["card_network"].map(PROCESSING_RATES).fillna(0.005)
+    approved["interchange"] = approved["amt"] * approved["card_network"].map(INTERCHANGE_RATES).fillna(0.0195)
+    approved["processing"]  = approved["amt"] * approved["card_network"].map(PROCESSING_RATES).fillna(0.0030)
 
     calc = approved.groupby("payout_week").agg(
         gross_amount     =("amt",          "sum"),
@@ -169,8 +171,8 @@ def _payout_history(ct: pd.DataFrame) -> pd.DataFrame:
         interchange_fee  =("interchange",  "sum"),
         processing_fee   =("processing",   "sum"),
     ).reset_index()
-    calc["network_fee"] = calc["gross_amount"] * 0.0020
-    calc["scheme_fee"]  = calc["gross_amount"] * 0.0008
+    calc["network_fee"] = calc["gross_amount"] * NETWORK_FEE_RATE
+    calc["scheme_fee"]  = calc["gross_amount"] * SCHEME_FEE_RATE
     calc["net_payout"]  = (calc["gross_amount"]
                            - calc["interchange_fee"]
                            - calc["processing_fee"]

@@ -184,12 +184,22 @@ def merchant_kpi_daily(merchant: str) -> pd.DataFrame:
     return _q(
         """
         SELECT DATE(trans_at) AS date,
-               SUM(amt) AS gross_volume,
-               COUNT(*) AS total_transactions,
-               AVG(amt) AS avg_ticket,
-               SUM(CASE WHEN txn_status = 'approved' THEN 1 ELSE 0 END)::float / COUNT(*) AS approval_rate,
-               SUM(CASE WHEN is_fraud = TRUE THEN 1 ELSE 0 END)::float / COUNT(*) AS fraud_rate,
-               SUM(CASE WHEN has_chargeback = TRUE THEN 1 ELSE 0 END) AS chargeback_count
+               SUM(amt)                                                        AS gross_volume,
+               COUNT(*)                                                        AS total_transactions,
+               AVG(amt)                                                        AS avg_ticket,
+               SUM(CASE WHEN txn_status = 'approved' THEN 1 ELSE 0 END)::float
+                   / NULLIF(COUNT(*), 0)                                       AS approval_rate,
+               SUM(CASE WHEN is_fraud = TRUE  THEN 1 ELSE 0 END)              AS fraud_count,
+               SUM(CASE WHEN is_fraud = TRUE  THEN 1 ELSE 0 END)::float
+                   / NULLIF(COUNT(*), 0)                                       AS fraud_rate,
+               SUM(CASE WHEN txn_status = 'declined' THEN 1 ELSE 0 END)       AS declined_count,
+               SUM(CASE WHEN has_chargeback = TRUE THEN 1 ELSE 0 END)         AS chargeback_count,
+               SUM(amt * CASE card_network
+                           WHEN 'Visa'       THEN 0.0215
+                           WHEN 'Mastercard' THEN 0.0220
+                           WHEN 'Amex'       THEN 0.0350
+                           WHEN 'ACH'        THEN 0.0080
+                           ELSE 0.0250 END)                                    AS processing_fees
         FROM clean.transactions
         WHERE merchant = :m
         GROUP BY DATE(trans_at) ORDER BY date
@@ -260,22 +270,22 @@ def merchant_payout_weekly(merchant: str) -> pd.DataFrame:
             DATE_TRUNC('week', trans_at)::date AS payout_date,
             SUM(amt) AS gross_amount,
             SUM(amt * CASE card_network
-                WHEN 'Visa'       THEN 0.0150
-                WHEN 'Mastercard' THEN 0.0160
-                WHEN 'Amex'       THEN 0.0270
-                WHEN 'ACH'        THEN 0.0050
-                ELSE 0.0165 END) AS interchange_fee,
+                WHEN 'Visa'       THEN 0.0160
+                WHEN 'Mastercard' THEN 0.0165
+                WHEN 'Amex'       THEN 0.0300
+                WHEN 'ACH'        THEN 0.0025
+                ELSE 0.0195 END) AS interchange_fee,
             SUM(amt * 0.0030) AS processing_fee,
-            SUM(amt * 0.0013) AS network_fee,
-            SUM(amt * 0.0005) AS scheme_fee,
+            SUM(amt * 0.0015) AS network_fee,
+            SUM(amt * 0.0010) AS scheme_fee,
             SUM(amt * (1.0 - (
                 CASE card_network
-                    WHEN 'Visa'       THEN 0.0150
-                    WHEN 'Mastercard' THEN 0.0160
-                    WHEN 'Amex'       THEN 0.0270
-                    WHEN 'ACH'        THEN 0.0050
-                    ELSE 0.0165 END
-                + 0.0030 + 0.0013 + 0.0005
+                    WHEN 'Visa'       THEN 0.0160
+                    WHEN 'Mastercard' THEN 0.0165
+                    WHEN 'Amex'       THEN 0.0300
+                    WHEN 'ACH'        THEN 0.0025
+                    ELSE 0.0195 END
+                + 0.0030 + 0.0015 + 0.0010
             ))) AS net_payout,
             COUNT(*) AS transaction_count
         FROM clean.transactions

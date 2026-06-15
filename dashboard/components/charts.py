@@ -74,14 +74,14 @@ def aggregate_kpi_timeseries(df, grain: str = "Month", date_col: str = "date") -
         else:
             row["period_label"] = str(period.year)
 
-        if "gross_volume" in frame.columns:
-            row["gross_volume"] = pd.to_numeric(frame["gross_volume"], errors="coerce").sum()
-        if "total_transactions" in frame.columns:
-            row["total_transactions"] = pd.to_numeric(frame["total_transactions"], errors="coerce").sum()
-        if "fraud_count" in frame.columns:
-            row["fraud_count"] = pd.to_numeric(frame["fraud_count"], errors="coerce").sum()
-        if "chargeback_count" in frame.columns:
-            row["chargeback_count"] = pd.to_numeric(frame["chargeback_count"], errors="coerce").sum()
+        for _sum_col in ("gross_volume", "total_transactions", "fraud_count", "chargeback_count",
+                         "processing_fees", "declined_count", "approved_count"):
+            if _sum_col in frame.columns:
+                row[_sum_col] = pd.to_numeric(frame[_sum_col], errors="coerce").sum()
+
+        # net_volume = gross_volume - processing_fees (recompute from aggregated totals)
+        if "gross_volume" in row and "processing_fees" in row:
+            row["net_volume"] = row["gross_volume"] - row["processing_fees"]
 
         if "gross_volume" in row and "total_transactions" in row and row["total_transactions"]:
             row["avg_ticket"] = row["gross_volume"] / row["total_transactions"]
