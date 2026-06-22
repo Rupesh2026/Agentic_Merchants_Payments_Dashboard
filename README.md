@@ -208,6 +208,78 @@ Anyone can type a question and get a data-backed answer:
 
 ---
 
+## Fraud Pattern Learning and Preventive Controls
+
+Beyond detecting fraud as it happens, this system enables a second, proactive workflow: **using historical fraud patterns to implement controls before the next wave arrives.**
+
+### The Core Insight
+
+The SHAP values stored in `gold.risk_scores.top_shap_features` are not just per-transaction explanations — they are a fingerprint of every fraud pattern the model has learned. When aggregated across thousands of fraud transactions at a merchant or category, they reveal exactly what is driving fraud: velocity spikes, geographic anomalies, time-of-day concentration, amount outliers, or card-not-present exposure.
+
+This turns the system into a **feedback loop between detection and prevention**.
+
+### The Ops Team + Merchant Collaboration Workflow
+
+```
+Step 1 — Pattern Detection (Ops Team)
+  Review fraud heatmap + SHAP distributions for a flagged merchant
+  Ask AI Analyst: "What are the top fraud signals for TravelBook?"
+  → Agent aggregates SHAP data across all fraud transactions at that merchant
+  → Returns: "76% of fraud at TravelBook has geo_distance > 500km
+              and tx_count_1h > 5 — velocity + impossible travel pattern"
+
+Step 2 — Pattern → Control Mapping
+  Translate each pattern into a concrete rule:
+  geo_distance > 500km  →  geographic velocity block
+  tx_count_1h > 5       →  velocity cap: max 3 transactions/hr per card
+  is_online + late night →  step-up authentication 10pm–3am
+
+Step 3 — Merchant Briefing
+  Share findings: "Your fraud rate is 1.8% (3.1× baseline). Here are the
+  top 3 patterns driving it and the controls we recommend."
+
+Step 4 — Controls Implemented
+  Merchant or processor configures rules in their payment gateway
+
+Step 5 — Monitoring (Ongoing)
+  Track gold.merchant_stats.fraud_rate weekly after controls go live
+  Ask AI: "What changed for TravelBook's fraud rate in the last 4 weeks?"
+  Compare before/after to measure effectiveness
+```
+
+### Fraud Pattern → Preventive Control Mapping
+
+| Pattern (from SHAP + Gold Tables) | Preventive Control |
+|---|---|
+| `geo_distance_km` is top fraud driver | Geo-velocity block: if transaction is >500km from cardholder city, require 3DS or decline |
+| `tx_count_1h` consistently high in fraud txns | Velocity cap: max 3 transactions per card per hour at this merchant |
+| `amt_zscore` high (amount far above customer norm) | Amount anomaly hold: transactions >3 std devs above customer average go to manual review |
+| `is_online` + `category_fraud_rate` elevated | Mandate CVV + 3DS for all card-not-present transactions in travel/entertainment/misc_net |
+| Fraud heatmap spikes 10pm–3am weekends | Time-based risk boost: apply stricter auth rules during identified peak fraud hours |
+| `merchant_fraud_rate` crosses 1% | Merchant escalation: lower velocity limits and require stronger auth for all transactions at this merchant |
+| `chargeback_count` trending up | Early-warning outreach: trigger merchant call at 0.5% chargeback rate — before Visa/MC's 1% penalty threshold |
+| High `is_rural` correlation with fraud | Rural restriction: require address verification on non-local card-not-present transactions |
+
+### Why This Is More Valuable Than Reactive Detection
+
+Most fraud systems are reactive — flag, sometimes block, investigate after. This workflow is **proactive**:
+
+- **Every historical fraud that slipped through** (the ~92% of fraud that was `approved` before detection) leaves a SHAP signature in the database. Those signatures tell you which controls you didn't have but should.
+- **Merchants get specificity, not just scores** — not "you have a fraud problem" but "your fraud concentrates Sunday nights in online transactions over $300 from cardholders more than 400km away — here is the exact rule to implement."
+- **Controls create feedback loops** — after a merchant implements velocity caps, the fraud heatmap for that merchant should shift. If fraud moves to a different time window, that reveals the next pattern to address.
+- **Chargeback prevention compounds** — since chargebacks lag fraud by 30–90 days, catching a pattern in historical data and acting now prevents the dispute wave from arriving next month, protecting both the merchant and the processor from Visa/MC chargeback monitoring programs.
+
+### What the AI Analyst Enables for This Workflow
+
+The AI Analyst is already equipped to support ops-merchant collaboration without any SQL:
+
+- *"What are the top 3 fraud patterns for TravelBook over the last 6 months?"* → aggregates SHAP signals across all fraud transactions at that merchant
+- *"Which merchants have fraud above 1% but haven't had a chargeback spike yet?"* → early identification of merchants to contact proactively
+- *"What changed for TravelBook's fraud rate after last month?"* → before/after comparison from gold.kpi_daily and gold.merchant_stats
+- *"Which hours and days should we apply stronger authentication for entertainment merchants?"* → reads fraud_heatmap filtered to that category
+
+---
+
 ## Architecture
 
 ```text
