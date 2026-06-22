@@ -29,3 +29,10 @@ __pycache__/
 .venv/
 venv/
 env/
+
+# Local-only docs (never push to remote)
+PPT.md
+present.md
+plan.md
+study.md
+implementation.md
